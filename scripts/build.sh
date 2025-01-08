@@ -17,25 +17,44 @@ cmake_minimum_required(VERSION 3.1)
 
 project(levelset)
 
+# Définir le standard C++
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 
-set(SRCS
-    ${SRC_DIR}/levelset.cpp
-    ${SRC_DIR}/main_loop.cpp
+# Définir le chemin vers le répertoire source
+set(SRC_DIR \${CMAKE_SOURCE_DIR}/../src)
+
+# Récupérer tous les fichiers .cpp du répertoire source
+file(GLOB_RECURSE SRCS
+    \${SRC_DIR}/*.cpp
+    \${SRC_DIR}/**/*.cpp
 )
 
-include_directories(${SRC_DIR})
+# Vérifier si des fichiers .cpp ont été trouvés
+if (NOT SRCS)
+    message(FATAL_ERROR "Aucun fichier .cpp trouvé dans le répertoire \${SRC_DIR}")
+endif()
 
+# Inclure le répertoire contenant les headers
+include_directories(
+    \${SRC_DIR}
+    \${SRC_DIR}/**
+)
+
+# Trouver la bibliothèque NEOS
 find_package(NEOS REQUIRED)
 
+# Ajouter l'exécutable avec tous les fichiers trouvés
 add_executable(levelset \${SRCS})
 
+# Lier la bibliothèque NEOS
 target_link_libraries(levelset neos::neos)
 
+# Définir le répertoire de sortie de l'exécutable
 set_target_properties(levelset PROPERTIES
-    RUNTIME_OUTPUT_DIRECTORY ${ROOT_DIR}
+    RUNTIME_OUTPUT_DIRECTORY \${CMAKE_SOURCE_DIR}/..
 )
+
 EOL
 
 # Aller dans le répertoire builds
@@ -43,9 +62,17 @@ cd "${BUILD_DIR}" || exit
 
 # Exécuter cmake et enregistrer les logs
 cmake . > "${LOG_DIR}/cmake_log.txt" 2>&1
+if [[ $? -ne 0 ]]; then
+    echo "CMake a échoué. Consultez les logs dans ${LOG_DIR}/cmake_log.txt."
+    exit 1
+fi
 
 # Exécuter make et enregistrer les logs
 make > "${LOG_DIR}/make_log.txt" 2>&1
+if [[ $? -ne 0 ]]; then
+    echo "Make a échoué. Consultez les logs dans ${LOG_DIR}/make_log.txt."
+    exit 1
+fi
 
 # Revenir au répertoire principal
 cd "${ROOT_DIR}" || exit
