@@ -18,7 +18,17 @@ class TransportScheme
         void initializePhi(PiercedVector<double> phi);
         const PiercedVector<double>& getPhi();
 
-        void compute();
+        void computePhi();
+
+        std::vector<long> getCellNeighbour(long cellId);
+        std::vector<double> getPhiNeighbour(std::vector<long> neighborsId);
+
+
+        std::vector<double> getFlux(long id, std::vector<double> neighborsPhi);
+        std::vector<double> getDelta(long id, std::vector<long> neighborsId);
+
+        double F_ordre1(double up, double um);
+        double G_ordre1(double up, double um);
 
 };
 

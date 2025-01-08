@@ -47,9 +47,9 @@ int main(int argc, char **argv) {
     // Loop across the scheme
     for (i = 1; i <= data.nbSteps; i++) {
         trpt->computePhi();
-        exportResults(grid, trpt->getPhi()phi, data.solName, i);
+        exportResults(grid, trpt->getPhi(), data.solName, i);
     }
-   
+    
     delete grid;
     delete trpt;
     
