@@ -8,16 +8,15 @@ class TransportScheme
     private:
         Data *_data;
         Grid *_grid;
-        Geometry *_geo;
 
-        std::vector<double> _phi;
+        PiercedVector<double> _phi;
 
     public:
-        TransportScheme(Data *data, Grid *grid, Geometry *geo) : _data(data), _grid(grid), _geo(geo) {}
+        TransportScheme(Data *data, Grid *grid) : _data(data), _grid(grid) {}
         ~TransportScheme() {}
 
-        void initializePhi();
-        std::vector<double> getPhi();
+        void initializePhi(PiercedVector<double> phi);
+        const PiercedVector<double>& getPhi();
 
         void compute();
 

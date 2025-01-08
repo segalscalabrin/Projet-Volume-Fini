@@ -1,26 +1,18 @@
 #include "transport.hpp"
 
 
-void TransportScheme::initializePhi()
+void TransportScheme::initializePhi(PiercedVector<double> phi)
 {
-    _geo->computeLevelSet(_grid);
+    _phi = phi;
 }
 
-std::vector<double> TransportScheme::getPhi()  
+const PiercedVector<double>& TransportScheme::getPhi()
 {
-    std::vector<double> phi(_grid->nbCells(), 0.0);
-
-    for (auto & cell : _grid->getCells()) {
-        const long &id = cell.getId();
-        phi[id] = _geo->getLevelSet(id);
-    }
-
-    return phi;   
+    return _phi;
 }
 
-void TransportScheme::compute()
+void TransportScheme::computePhi()
 {
-    trpt->compute(_phi, data->u, data->dt);
-    geo->updateCenter(data.dt, data.u);
+    return;
 }
 

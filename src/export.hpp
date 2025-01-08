@@ -3,6 +3,6 @@
 
 #include "include.hpp"
 
-void exportResults(Grid *grid, std::vector<double> levelSetValues, std::string fileName, int iteration);
+void exportResults(Grid *grid, const PiercedVector<double>& levelSetValues, std::string fileName, int iteration);
 
 #endif

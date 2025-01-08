@@ -27,32 +27,34 @@ sudo docker run -it -v $(pwd):/builds/workspace neos
 #include "include.hpp"
 
 #include "export.hpp"
-#include "grid.hpp"
 #include "transport.hpp"
+#include "geometry.hpp"
 
 
 int main(int argc, char **argv) {
     Neos_Init(&argc, &argv);
-
     int i(0);
 
     // Create struct and class pointer
     Data            data;
-    ASphere         *geo  = new ASphere(0, 0, 0, 1.5, 2);
     Grid            *grid = new Grid(-1.0, -1.0, 0.0, 2.0, 2.0 / std::pow(2, data.level), data.dim);
-    TransportScheme *trpt = new TransportScheme(&data, grid, geo);
+    TransportScheme *trpt = new TransportScheme(&data, grid);
 
     // Initial pos
-    trpt->initializePhi();
+    trpt->initializePhi(initializePhiWithGeometry(grid));
     exportResults(grid, trpt->getPhi(), data.solName, i);
 
     // Loop across the scheme
     for (i = 1; i <= data.nbSteps; i++) {
-        phi = getLevelSet(grid, geo);
-        exportResults(grid, phi, data.solName, i);
+        trpt->computePhi();
+        exportResults(grid, trpt->getPhi()phi, data.solName, i);
     }
+   
+    delete grid;
+    delete trpt;
     
     Neos_Finalize();
+
     return 0;
 }
 
