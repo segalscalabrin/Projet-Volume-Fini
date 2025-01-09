@@ -28,7 +28,7 @@ void TransportScheme::computePhi()
     // Regrouper les flux dans un std::array
     std::array<PiercedVector<double>, 4> flux = {fp, fm, gp, gm};
 
-    computeFlux(flux);
+    computeFlux(flux, 1);
 
     for (auto &cell : _grid->getCells()) {
         const long &id = cell.getId();
@@ -36,9 +36,8 @@ void TransportScheme::computePhi()
         std::vector<long> neighborsId;
         std::vector<double> neighborsPhi;
 
-        delta = _data->h;
-
-        new_phi[id] = _phi[id] - _data->dt/delta * (flux[1][id] - flux[0][id]) - _data->dt/delta * (flux[3][id] - flux[2][id]);
+        new_phi[id] = _phi[id] - (_data->dt / _data->h) * (flux[1][id] - flux[0][id])
+                               - (_data->dt / _data->h) * (flux[3][id] - flux[2][id]);
     }
 
     _phi = new_phi;
@@ -46,7 +45,7 @@ void TransportScheme::computePhi()
 
 
 
-void TransportScheme::computeFlux(std::array<PiercedVector<double>, 4>& flux)
+void TransportScheme::computeFlux(std::array<PiercedVector<double>, 4>& flux, int ordre)
 {
     std::array<long, 2> ownersId;
     NPoint center1, center2;
@@ -60,30 +59,31 @@ void TransportScheme::computeFlux(std::array<PiercedVector<double>, 4>& flux)
         if (!inter.isBorder()) {
             center2 = _grid->evalCellCentroid(ownersId[1]);
             if (center1[NPX] < center2[NPX] && center1[NPZ] == center2[NPZ]) {
-                f = F_ordre1(_phi[ownersId[1]], _phi[ownersId[0]]);
+                f = Flux_F(ordre, _phi[ownersId[1]], _phi[ownersId[0]]);
+                std::cout << f << std::endl;
                 flux[1][ownersId[0]] = f;
                 flux[0][ownersId[1]] = f;
             } 
             else if (center1[NPX] > center2[NPX] && center1[NPZ] == center2[NPZ]) {
-                f = F_ordre1(_phi[ownersId[0]], _phi[ownersId[1]]);
+                f = Flux_F(ordre, _phi[ownersId[0]], _phi[ownersId[1]]);
                 flux[0][ownersId[0]] = f;
                 flux[1][ownersId[1]] = f;
             } 
             else if (center1[NPY] < center2[NPY] && center1[NPZ] == center2[NPZ]) {
-                f = G_ordre1(_phi[ownersId[1]], _phi[ownersId[0]]);
-                flux[3][ownersId[0]] = f;
-                flux[2][ownersId[1]] = f;
+                g = Flux_G(ordre, _phi[ownersId[1]], _phi[ownersId[0]]);
+                flux[3][ownersId[0]] = g;
+                flux[2][ownersId[1]] = g;
             } 
             else if (center1[NPY] > center2[NPY] && center1[NPZ] == center2[NPZ]) {
-                f = G_ordre1(_phi[ownersId[0]], _phi[ownersId[1]]);
-                flux[2][ownersId[0]] = f;
-                flux[3][ownersId[1]] = f;
+                g = Flux_G(ordre, _phi[ownersId[0]], _phi[ownersId[1]]);
+                flux[2][ownersId[0]] = g;
+                flux[3][ownersId[1]] = g;
             }
         }
         else {
             center2 = _grid->evalInterfaceCentroid(inter.getId());
-            f = F_ordre1(_phi[ownersId[0]], _phi[ownersId[0]]);
-            g = G_ordre1(_phi[ownersId[0]], _phi[ownersId[0]]);
+            f = Flux_F(ordre, _phi[ownersId[0]], _phi[ownersId[0]]);
+            g = Flux_G(ordre, _phi[ownersId[0]], _phi[ownersId[0]]);
             if (center1[NPX] < center2[NPX] && center1[NPZ] == center2[NPZ]) {
                 flux[1][ownersId[0]] = f;
             } 
@@ -100,118 +100,51 @@ void TransportScheme::computeFlux(std::array<PiercedVector<double>, 4>& flux)
     }
 }
 
-/*
-std::vector<long> TransportScheme::getCellNeighbour(long cellId)
-{
-    int k(0);
-    std::vector<long> neighboursId(6, -1);
-    long neighbourId(-1);
-    NPoint centerTarget;
-    NPoint centerNeighbor;
 
-    centerTarget = _grid->evalCellCentroid(cellId);
-
-    auto& interfaces(_grid->getInterfaces());
-
-
-
-
-
-
-
-    std::cout << "x: " << centerTarget[0] << " y: " << centerTarget[1] << " z: " << centerTarget[2] << std::endl;
-    std::cout << std::endl;
-
-    for (auto inter : interfaces) {
-        NPoint centerInter = _grid->evalInterfaceCentroid(inter.getId());
-        std::cout << "x: " << centerInter[0] << " y: " << centerInter[1] << " z: " << centerInter[2] << std::endl;
-        std::cout << inter.isBorder() << std::endl;
-        std::cout << k << std::endl;      
-        k++;
+double TransportScheme::Flux_F(int ordre, double up, double um)
+{   
+    if (ordre == 3) {
+        std::cerr << "pas implémenté" << std::endl;
+        exit(1);
     }
-    
-    for (auto inter : interfaces) {
-        if(!inter.isBorder()) {
-            neighbourId = inter.getOwnerNeigh()[1];
-            NPoint centerNeighbor = _grid->evalCellCentroid(neighbourId); 
-
-            if (centerNeighbor[NPX] > centerTarget[NPX] && centerNeighbor[NPZ] == centerTarget[NPZ]) {
-                neighboursId[1] = neighbourId;
-            } 
-            else if (centerNeighbor[NPX] < centerTarget[NPX] && centerNeighbor[NPZ] == centerTarget[NPZ]) {
-                neighboursId[0] = neighbourId;
-            } 
-            else if (centerNeighbor[NPY] > centerTarget[NPY] && centerNeighbor[NPZ] == centerTarget[NPZ]) {
-                neighboursId[3] = neighbourId;
-            } 
-            else if (centerNeighbor[NPY] < centerTarget[NPY] && centerNeighbor[NPZ] == centerTarget[NPZ]) {
-                neighboursId[2] = neighbourId;
-            }
-        }
+    else if(ordre == 2) {
+        return F_ordre2(up, um);
     }
-
-    for (int i=0; i<4; i++) {
-        std::cout << neighboursId[i] << std::endl;
-        if(neighboursId[i] == -1) {
-            if (i==0) {
-                neighboursId[i] = neighboursId[1];
-            }
-            else if (i==1) {
-                neighboursId[i] = neighboursId[0];
-            }
-            else if (i==2) {
-                neighboursId[i] = neighboursId[3];
-            }
-            else if (i==3) {
-                neighboursId[i] = neighboursId[2];
-            }
-        }
-    }    
-    for (int i=0; i<4; i++) {
-        std::cout << neighboursId[i] << std::endl;
+    else {
+        return F_ordre1(up, um);
     }
-
-    return neighboursId;
 }
 
-std::vector<double> TransportScheme::getPhiNeighbour(std::vector<long> neighborsId)
-{
-    std::vector<double> neighborsPhi;
-    for(auto neighId : neighborsId) {
-        neighborsPhi.push_back(_phi[neighId]);
+double TransportScheme::Flux_G(int ordre, double up, double um)
+{   
+    if (ordre == 3) {
+        std::cerr << "pas implémenté" << std::endl;
+        exit(1);
     }
-
-    return neighborsPhi;
+    else if(ordre == 2) {
+        return F_ordre2(up, um);
+    }
+    else {
+        return F_ordre1(up, um);
+    }
 }
 
 
-std::vector<double> TransportScheme::getFlux(long cellId, std::vector<double> neighborsPhi)
-{
-    std::vector<double> flux;
+double TransportScheme::F_ordre2(double up, double um)
+{   
+    double ux = _data->u[0]; 
+    double c = ux * _data->dt / _data->h;
 
-    flux.push_back(F_ordre1(neighborsPhi[1], _phi[cellId]));
-    flux.push_back(F_ordre1(_phi[cellId], neighborsPhi[0]));
-    flux.push_back(F_ordre1(neighborsPhi[3], _phi[cellId]));
-    flux.push_back(F_ordre1(_phi[cellId], neighborsPhi[2]));
-
-    return flux;
-}
-*/
-
-std::vector<double> TransportScheme::getDelta(long cellId, std::vector<long> neighborsId)
-{
-    std::vector<double> delta;
-    std::array<double, 3> ic, xc, yc;
-    ic = _grid->evalCellCentroid(cellId);
-    xc = _grid->evalCellCentroid(neighborsId[0]);
-    yc = _grid->evalCellCentroid(neighborsId[2]);
-
-    delta.push_back(abs(ic[0]-xc[0]));
-    delta.push_back(abs(ic[1]-yc[1]));
-
-    return delta;
+    return 0.5 * ux * (up + um - c * (up - um));
 }
 
+double TransportScheme::G_ordre2(double up, double um)
+{   
+    double uy = _data->u[1]; 
+    double c = uy * _data->dt / _data->h; 
+
+    return 0.5 * uy * (up + um - c * (up - um));
+}
 
 double TransportScheme::F_ordre1(double up, double um)
 {   

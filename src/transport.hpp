@@ -20,15 +20,15 @@ class TransportScheme
 
         void computePhi();
 
-        void computeFlux(std::array<PiercedVector<double>, 4>& flux);
+        void computeFlux(std::array<PiercedVector<double>, 4>& flux, int ordre);
 
-        std::vector<long> getCellNeighbour(long cellId);
-        std::vector<double> getPhiNeighbour(std::vector<long> neighborsId);
-
-
-        std::vector<double> getFlux(long id, std::vector<double> neighborsPhi);
         std::vector<double> getDelta(long id, std::vector<long> neighborsId);
 
+        double Flux_F(int ordre, double up, double um);
+        double Flux_G(int ordre, double up, double um);
+
+        double F_ordre2(double up, double um);
+        double G_ordre2(double up, double um);
         double F_ordre1(double up, double um);
         double G_ordre1(double up, double um);
 
