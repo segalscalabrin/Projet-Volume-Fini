@@ -20,6 +20,8 @@ class TransportScheme
 
         void computePhi();
 
+        void computeFlux(std::array<PiercedVector<double>, 4>& flux);
+
         std::vector<long> getCellNeighbour(long cellId);
         std::vector<double> getPhiNeighbour(std::vector<long> neighborsId);
 
