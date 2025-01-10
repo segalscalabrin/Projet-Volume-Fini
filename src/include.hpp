@@ -28,7 +28,7 @@ struct Data {
 
     // Constructor to initialize members
     Data()
-        : h(2.0 / std::pow(2, level)), solName("solutions/sol_numerique/levelset_"), solNameExacte("solutions/sol_exacte/levelset_") {
+        : h(2.0 / std::pow(2, level)), solName("solutions/sol_numerique/levelset_"), solNameExacte("solutions/sol_exacte/levelset_exact_") {
         u.push_back(1.0);
         u.push_back(0.0);
         u.push_back(0.0);

@@ -27,6 +27,8 @@ class TransportScheme
 
         bool critereMood(long cellId, double new_u);
 
+        double cellBorderCheck(long cellId, long cellToCheckId, std::string signe, std::string direction);
+
         std::array<double, 4> computeCellFlux(int cellId, int ordre);
 
         double computeFlux(long cellmId, long cellId, long cellpId, int ordre, std::string signe, std::string direction);

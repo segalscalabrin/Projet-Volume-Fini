@@ -96,12 +96,43 @@ bool TransportScheme::critereMood(long cellId, double new_u) {
     return (new_u > umin && new_u < umax);
 }
 
-long cellBorderCheck(long cellId, long cellToCheckId) {
+double TransportScheme::cellBorderCheck(long cellId, long cellToCheckId, std::string signe, std::string direction) {
+    double cellSize(0), borderPhi(0);
     if(cellToCheckId != -1) {
-        return cellToCheckId;
+        borderPhi = _phi[cellToCheckId];
+        return borderPhi;
     }
     else {
-        return cellId;
+        std::array<double, 3> borderCoord(_grid->evalCellCentroid(cellId));
+        cellSize = _grid->evalCellSize(cellId);
+        if (direction==std::string("horizontal")) {
+            if (signe==std::string("moins")) {
+                borderCoord[0] -= cellSize;
+                borderPhi = _geo->getLevelSet(borderCoord);
+                return borderPhi;
+            }
+            else {
+                borderCoord[0] += cellSize;
+                borderPhi = _geo->getLevelSet(borderCoord);
+                return borderPhi;  
+            }
+        }
+        else if (direction==std::string("vertical")) {
+            if (signe==std::string("moins")) {
+                borderCoord[1] -= cellSize;
+                borderPhi = _geo->getLevelSet(borderCoord);
+                return borderPhi;
+            }
+            else {
+                borderCoord[1] += cellSize;
+                borderPhi = _geo->getLevelSet(borderCoord);
+                return borderPhi;  
+            }
+        }
+        else {
+            std::cerr << "Erreur border check" << std::endl;
+            exit(1);
+        }
     }
 }
 
@@ -112,11 +143,10 @@ std::array<double, 4> TransportScheme::computeCellFlux(int cellId, int ordre)
 
     neighsId = getCellNeighs(cellId);
 
-    flux[0] = computeFlux(cellBorderCheck(cellId, neighsId[0]), cellId, cellBorderCheck(cellId, neighsId[1]), ordre, std::string("moins"), std::string("horizontal"));
-    flux[1] = computeFlux(cellBorderCheck(cellId, neighsId[0]), cellId, cellBorderCheck(cellId, neighsId[1]), ordre, std::string("plus"), std::string("horizontal"));
-
-    flux[2] = computeFlux(cellBorderCheck(cellId, neighsId[2]), cellId, cellBorderCheck(cellId, neighsId[3]), ordre, std::string("moins"), std::string("vertical"));
-    flux[3] = computeFlux(cellBorderCheck(cellId, neighsId[2]), cellId, cellBorderCheck(cellId, neighsId[3]), ordre, std::string("plus"), std::string("vertical"));
+    flux[0] = computeFlux(neighsId[0], cellId, neighsId[1], ordre, std::string("moins"), std::string("horizontal"));
+    flux[1] = computeFlux(neighsId[0], cellId, neighsId[1], ordre, std::string("plus"), std::string("horizontal"));
+    flux[2] = computeFlux(neighsId[2], cellId, neighsId[3], ordre, std::string("moins"), std::string("vertical"));
+    flux[3] = computeFlux(neighsId[2], cellId, neighsId[3], ordre, std::string("plus"), std::string("vertical"));
 
     return flux;
 }
@@ -124,11 +154,17 @@ std::array<double, 4> TransportScheme::computeCellFlux(int cellId, int ordre)
 
 double TransportScheme::computeFlux(long cellmId, long cellId, long cellpId, int ordre, std::string signe, std::string direction)
 {   
+    double phiM, phi, phiP;
+
+    phi = _phi[cellId];
+    phiM = cellBorderCheck(cellId, cellmId, std::string("moins"), direction);
+    phiP = cellBorderCheck(cellId, cellpId, std::string("plus"), direction);
+
     if (direction==std::string("horizontal")) {
-        return Flux_F(_phi[cellmId], _phi[cellId], _phi[cellpId], ordre, signe);
+        return Flux_F(phiM, phi, phiP, ordre, signe);
     }
     else if (direction==std::string("vertical")) {
-        return Flux_G(_phi[cellmId], _phi[cellId], _phi[cellpId], ordre, signe);
+        return Flux_G(phiM, phi, phiP, ordre, signe);
     }
     else {
         std::cerr << "Direction flux non conforme" << std::endl;
