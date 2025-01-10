@@ -4,6 +4,14 @@
 void TransportScheme::initializePhi(PiercedVector<double> phi)
 {
     _phi = phi;
+
+    std::array<long, 4> neighs;
+    neighs = getCellNeighs(859);
+    for(auto neigh : neighs) {
+        if (neigh != -1) {
+            _phi[neigh] = 1;
+        }
+    }
 }
 
 const PiercedVector<double>& TransportScheme::getPhi()
@@ -44,6 +52,34 @@ void TransportScheme::computePhi()
 }
 
 
+std::array<long, 4> TransportScheme::getCellNeighs(long cellId)
+{
+    std::vector<long> unorderedNeighs;
+    std::array<long, 4> neighs{-1, -1, -1, -1};
+    unorderedNeighs = _grid->findCellNeighs(cellId, 1, false);
+    NPoint center1, center2;
+    center1 = _grid->evalCellCentroid(cellId);
+
+    for(auto neighId : unorderedNeighs) {
+        
+        center2 = _grid->evalCellCentroid(neighId);
+        if (center1[NPX] > center2[NPX] && center1[NPZ] == center2[NPZ]) {
+            neighs[0] = neighId;
+        } 
+        else if (center1[NPX] < center2[NPX] && center1[NPZ] == center2[NPZ]) {
+            neighs[1] = neighId;
+        } 
+        else if (center1[NPY] > center2[NPY] && center1[NPZ] == center2[NPZ]) {
+            neighs[2] = neighId;
+        } 
+        else if (center1[NPY] < center2[NPY] && center1[NPZ] == center2[NPZ]) {
+            neighs[3] = neighId;
+        }
+    }
+
+    return neighs;
+}
+
 
 void TransportScheme::computeFlux(std::array<PiercedVector<double>, 4>& flux, int ordre)
 {
@@ -60,7 +96,6 @@ void TransportScheme::computeFlux(std::array<PiercedVector<double>, 4>& flux, in
             center2 = _grid->evalCellCentroid(ownersId[1]);
             if (center1[NPX] < center2[NPX] && center1[NPZ] == center2[NPZ]) {
                 f = Flux_F(ordre, _phi[ownersId[1]], _phi[ownersId[0]]);
-                std::cout << f << std::endl;
                 flux[1][ownersId[0]] = f;
                 flux[0][ownersId[1]] = f;
             } 

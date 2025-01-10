@@ -22,7 +22,7 @@ class TransportScheme
 
         void computeFlux(std::array<PiercedVector<double>, 4>& flux, int ordre);
 
-        std::vector<double> getDelta(long id, std::vector<long> neighborsId);
+        std::array<long, 4> getCellNeighs(long cellId);
 
         double Flux_F(int ordre, double up, double um);
         double Flux_G(int ordre, double up, double um);
