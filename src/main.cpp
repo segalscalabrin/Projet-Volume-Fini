@@ -35,9 +35,9 @@ int main(int argc, char **argv) {
     int i(0);
 
     // Create struct and class pointer
-    Data            data;
-    Grid            *grid = new Grid(-1.0, -1.0, 0.0, 2.0, 2.0 / std::pow(2, data.level), data.dim);
-    ASphere         *geo  = new ASphere(-0.5, 0, 0, 0.5, 2);
+    Data            data(atoi(argv[argc - 3]), atoi(argv[argc - 2]), atoi(argv[argc - 1]));
+    Grid            *grid = new Grid(data.xmin, data.ymin, 0.0, data.l, data.l / std::pow(2, data.level), data.dim);
+    ASphere         *geo  = new ASphere(-0.5, 0, 0, 0.0, 2);
     TransportScheme *trpt = new TransportScheme(&data, grid, geo);
 
     // Initial pos
@@ -45,16 +45,20 @@ int main(int argc, char **argv) {
     exportResults(grid, trpt->getPhi(), data.solName, i);
 
     // Loop across the scheme
-    for (i = 1; i <= data.nbSteps; i++) {
+    while(trpt->getT() < 1.0) {
+        i++;
         trpt->computePhi();
         if (i%10==0) {
             exportResults(grid, trpt->getPhi(), data.solName, i/10);
             exportResults(grid, trpt->getPhiExact(), data.solNameExacte, i/10);
         }
     }
+
+    std::cout << "CFL: " << data.u[0] * data.dt / data.h << std::endl;
+    std::cout << "Erreur: " << computeError(grid, trpt->getPhi(), trpt->getPhiExact()) << std::endl;
     
-    delete grid;
     delete trpt;
+    delete grid;
     delete geo;
     
     Neos_Finalize();

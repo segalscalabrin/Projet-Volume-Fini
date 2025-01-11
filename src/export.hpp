@@ -5,4 +5,6 @@
 
 void exportResults(Grid *grid, const PiercedVector<double>& levelSetValues, std::string fileName, int iteration);
 
+double computeError(Grid *grid, PiercedVector<double> phi, PiercedVector<double> phiExact);
+
 #endif

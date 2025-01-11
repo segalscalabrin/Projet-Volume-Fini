@@ -11,3 +11,14 @@ void exportResults(Grid *grid, const PiercedVector<double>& levelSetValues, std:
 
     grid->write();
 }
+
+
+double computeError(Grid *grid, PiercedVector<double> phi, PiercedVector<double> phiExact)
+{
+    double error(0.0);
+    for (int i=0; i<phi.size(); i++) {
+        error += (phi[i] - phiExact[i])*(phi[i] - phiExact[i]);
+    }   
+
+    return sqrt(error/phi.size());
+}

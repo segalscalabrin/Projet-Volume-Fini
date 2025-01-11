@@ -15,5 +15,5 @@ fi
 
 # Exécuter le projet si aucun autre argument n'est donné
 if [[ "$1" == "run" ]]; then
-    ./scripts/run.sh
+    ./scripts/run.sh $2 $3 $4
 fi

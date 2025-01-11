@@ -3,9 +3,8 @@
 
 void TransportScheme::initializePhi()
 {    
-    _geo->computeLevelSet(_grid);
-    _phi = _geo->getPhi();
-    _phiExact = _geo->getPhi();
+    _phi = computeSolInit(_grid, _geo, _data->cas);
+    _phiExact = computeSolExacte(_grid, _geo, _data, _t, _data->cas);
 }
 
 const PiercedVector<double>& TransportScheme::getPhi()
@@ -18,11 +17,18 @@ const PiercedVector<double>& TransportScheme::getPhiExact()
     return _phiExact;
 }
 
+const double& TransportScheme::getT()
+{
+    return _t;
+}
+
+
 void TransportScheme::computePhi()
 {
     // Initialiser les vecteurs auxiliaires
     std::vector<double> new_phi0(_grid->nbCells(), 0.0);
     PiercedVector<double> new_phi = VtoPV(new_phi0, _grid);
+    _t += _data->dt;
 
     for (auto &cell : _grid->getCells()) {
         const long &cellId = cell.getId();
@@ -32,23 +38,36 @@ void TransportScheme::computePhi()
         int ordreMood(_data->ordre);
 
         flux = computeCellFlux(cellId, ordreMood);
-        new_phi[cellId] = _phi[cellId] - (_data->dt / _data->h) * (flux[1] - flux[0])
-                            - (_data->dt / _data->h) * (flux[3] - flux[2]);
+        new_phi[cellId] = _phi[cellId]  - (_data->dt / _data->h) * (flux[1] - flux[0])
+                                        - (_data->dt / _data->h) * (flux[3] - flux[2]);
 
-        while(!critereMood(cellId, new_phi[cellId]) && ordreMood > 1) {  
+        if (cellId == 0) {
+            std::array<long, 4> neigh(getCellNeighs(cellId));
+            std::cout << "Phi i: " << _phi[cellId] << std::endl;
+            std::cout << "Phi imx: " << _phi[neigh[0]] << std::endl;
+            std::cout << "Phi ipx: " << _phi[neigh[1]] << std::endl;
+            std::cout << std::endl;
+            std::cout << "Phi new: " << new_phi[cellId] << std::endl;
+
+            std::cout << "Flux mx: " << flux[0] << std::endl;
+            std::cout << "Flux px: " << flux[1] << std::endl;
+            std::cout << "Flux my: " << flux[2] << std::endl;
+            std::cout << "Flux py: " << flux[3] << std::endl;
+            std::cout << std::endl;
+            std::cout << std::endl;
+
+        }
+
+        while(!critereMood(cellId, new_phi[cellId]) && ordreMood > 1) {
             ordreMood--;
             flux = computeCellFlux(cellId, ordreMood);
-            new_phi[cellId] = _phi[cellId] - (_data->dt / _data->h) * (flux[1] - flux[0])
-                                - (_data->dt / _data->h) * (flux[3] - flux[2]);
+            new_phi[cellId] = _phi[cellId]  - (_data->dt / _data->h) * (flux[1] - flux[0])
+                                            - (_data->dt / _data->h) * (flux[3] - flux[2]);
         }
-        
     }
 
     _phi = new_phi;
-
-    _geo->updateCenter(_data->dt, _data->u);
-    _geo->computeLevelSet(_grid);
-    _phiExact = _geo->getPhi();
+    _phiExact = computeSolExacte(_grid, _geo, _data, _t, _data->cas);
 }
 
 
@@ -96,6 +115,17 @@ bool TransportScheme::critereMood(long cellId, double new_u) {
     return (new_u > umin && new_u < umax);
 }
 
+double TransportScheme::boundaryCondition(std::array<double, 3> coord)
+{
+    if (_data->cas < 4) {
+        std::cout << solExacte(coord[0], coord[1], _t, _data->cas) << std::endl;
+        return solExacte(coord[0], coord[1], _t, _data->cas);
+    }
+    else {
+        return _geo->getLevelSet(coord);
+    }
+}
+
 double TransportScheme::cellBorderCheck(long cellId, long cellToCheckId, std::string signe, std::string direction) {
     double cellSize(0), borderPhi(0);
     if(cellToCheckId != -1) {
@@ -108,24 +138,24 @@ double TransportScheme::cellBorderCheck(long cellId, long cellToCheckId, std::st
         if (direction==std::string("horizontal")) {
             if (signe==std::string("moins")) {
                 borderCoord[0] -= cellSize;
-                borderPhi = _geo->getLevelSet(borderCoord);
+                borderPhi = boundaryCondition(borderCoord);
                 return borderPhi;
             }
             else {
                 borderCoord[0] += cellSize;
-                borderPhi = _geo->getLevelSet(borderCoord);
+                borderPhi = boundaryCondition(borderCoord);
                 return borderPhi;  
             }
         }
         else if (direction==std::string("vertical")) {
             if (signe==std::string("moins")) {
                 borderCoord[1] -= cellSize;
-                borderPhi = _geo->getLevelSet(borderCoord);
+                borderPhi = boundaryCondition(borderCoord);
                 return borderPhi;
             }
             else {
                 borderCoord[1] += cellSize;
-                borderPhi = _geo->getLevelSet(borderCoord);
+                borderPhi = boundaryCondition(borderCoord);
                 return borderPhi;  
             }
         }
@@ -154,17 +184,21 @@ std::array<double, 4> TransportScheme::computeCellFlux(int cellId, int ordre)
 
 double TransportScheme::computeFlux(long cellmId, long cellId, long cellpId, int ordre, std::string signe, std::string direction)
 {   
-    double phiM, phi, phiP;
+    double phiM, phi, phiP, vx, vy;
 
     phi = _phi[cellId];
     phiM = cellBorderCheck(cellId, cellmId, std::string("moins"), direction);
     phiP = cellBorderCheck(cellId, cellpId, std::string("plus"), direction);
 
+    std::array<double, 3> cellCoord(_grid->evalCellCentroid(cellId));
+    vx = vitesseX(cellCoord[0], cellCoord[1], _data->cas);
+    vy = vitesseY(cellCoord[0], cellCoord[1], _data->cas);
+
     if (direction==std::string("horizontal")) {
-        return Flux_F(phiM, phi, phiP, ordre, signe);
+        return Flux_F(phiM, phi, phiP, vx, vy, ordre, signe);
     }
     else if (direction==std::string("vertical")) {
-        return Flux_G(phiM, phi, phiP, ordre, signe);
+        return Flux_G(phiM, phi, phiP, vx, vy, ordre, signe);
     }
     else {
         std::cerr << "Direction flux non conforme" << std::endl;
@@ -172,18 +206,17 @@ double TransportScheme::computeFlux(long cellmId, long cellId, long cellpId, int
     }
 }
 
-double TransportScheme::Flux_F(double um, double u, double up, int ordre, std::string signe)
+double TransportScheme::Flux_F(double um, double u, double up, double vx, double vy, int ordre, std::string signe)
 {   
     if (ordre == 3) {
-        std::cerr << "pas implémenté" << std::endl;
-        exit(1);
+        return F_ordre3(um, u, up, vx, vy, signe);
     }
     else if(ordre == 2) {
         if (signe==std::string("plus")) {
-            return F_ordre2(u, up);
+            return F_ordre2(u, up, vx, vy);
         }
         else if (signe==std::string("moins")) {
-            return F_ordre2(um, u);
+            return F_ordre2(um, u, vx, vy);
         }
         else {
             std::cerr << "Signe flux non conforme" << std::endl;
@@ -192,10 +225,10 @@ double TransportScheme::Flux_F(double um, double u, double up, int ordre, std::s
     }
     else if(ordre == 1) {
         if (signe==std::string("plus")) {
-            return F_ordre1(u, up);
+            return F_ordre1(u, up, vx, vy);
         }
         else if (signe==std::string("moins")) {
-            return F_ordre1(um, u);
+            return F_ordre1(um, u, vx, vy);
         }
         else {
             std::cerr << "Signe flux non conforme" << std::endl;
@@ -208,18 +241,17 @@ double TransportScheme::Flux_F(double um, double u, double up, int ordre, std::s
     }
 }
 
-double TransportScheme::Flux_G(double um, double u, double up, int ordre, std::string signe)
+double TransportScheme::Flux_G(double um, double u, double up, double vx, double vy, int ordre, std::string signe)
 {   
     if (ordre == 3) {
-        std::cerr << "pas implémenté" << std::endl;
-        exit(1);
+        return G_ordre3(um, u, up, vx, vy, signe);
     }
     else if(ordre == 2) {
         if (signe==std::string("plus")) {
-            return G_ordre2(u, up);
+            return G_ordre2(u, up, vx, vy);
         }
         else if (signe==std::string("moins")) {
-            return G_ordre2(um, u);
+            return G_ordre2(um, u, vx, vy);
         }
         else {
             std::cerr << "Signe flux non conforme" << std::endl;
@@ -228,10 +260,10 @@ double TransportScheme::Flux_G(double um, double u, double up, int ordre, std::s
     }
     else if(ordre == 1) {
         if (signe==std::string("plus")) {
-            return G_ordre1(u, up);
+            return G_ordre1(u, up, vx, vy);
         }
         else if (signe==std::string("moins")) {
-            return G_ordre1(um, u);
+            return G_ordre1(um, u, vx, vy);
         }
         else {
             std::cerr << "Signe flux non conforme" << std::endl;
@@ -245,40 +277,59 @@ double TransportScheme::Flux_G(double um, double u, double up, int ordre, std::s
 }
 
 
-double TransportScheme::F_ordre2(double um, double up)
+double TransportScheme::F_ordre3(double um, double u, double up, double vx, double vy, std::string signe)
 {   
-    double ux = _data->u[0]; 
-    double c = ux * _data->dt / _data->h;
-
-    return 0.5 * ux * (up + um - c * (up - um));
-}
-
-double TransportScheme::G_ordre2(double um, double up)
-{   
-    double uy = _data->u[1]; 
-    double c = uy * _data->dt / _data->h; 
-
-    return 0.5 * uy * (up + um - c * (up - um));
-}
-
-double TransportScheme::F_ordre1(double um, double up)
-{   
-    double ux(_data->u[0]);
-    if (ux>=0) {
-        return ux*um;
+    double ratio1(1./8.), ratio2(3./8.); 
+    if (signe==std::string("plus")) {
+        return vx*(ratio2*u + ratio2*up - ratio1*um);
     }
     else {
-        return ux*up;
+        return vx*(ratio2*u + ratio2*um - ratio1*up);
     }
 }
 
-double TransportScheme::G_ordre1(double um, double up)
+double TransportScheme::G_ordre3(double um, double u, double up, double vx, double vy, std::string signe)
 {   
-    double uy(_data->u[1]);
-    if (uy>=0) {
-        return uy*um;
+    double ratio1(1./8.), ratio2(3./8.); 
+    if (signe==std::string("plus")) {
+        return vy*(ratio2*u + ratio2*up - ratio1*um);
     }
     else {
-        return uy*up;
+        return vy*(ratio2*u + ratio2*um - ratio1*up);
+    }
+}
+
+
+double TransportScheme::F_ordre2(double um, double up, double vx, double vy)
+{   
+    double c = vx * _data->dt / _data->h;
+
+    return 0.5 * vx * (up + um - c * (up - um));
+}
+
+double TransportScheme::G_ordre2(double um, double up, double vx, double vy)
+{   
+    double c = vy * _data->dt / _data->h; 
+
+    return 0.5 * vy * (up + um - c * (up - um));
+}
+
+double TransportScheme::F_ordre1(double um, double up, double vx, double vy)
+{   
+    if (vx>=0) {
+        return vx*um;
+    }
+    else {
+        return vx*up;
+    }
+}
+
+double TransportScheme::G_ordre1(double um, double up, double vx, double vy)
+{   
+    if (vy>=0) {
+        return vy*um;
+    }
+    else {
+        return vy*up;
     }
 }
