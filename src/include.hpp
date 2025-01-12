@@ -39,7 +39,7 @@ struct Data {
           solNameExacte("solutions/sol_exacte/levelset_exact_")
     {
         u.push_back(1.0);
-        u.push_back(0.0);
+        u.push_back(1.0);
         u.push_back(0.0);
     }
 };

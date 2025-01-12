@@ -37,7 +37,7 @@ int main(int argc, char **argv) {
     // Create struct and class pointer
     Data            data(atoi(argv[argc - 2]), atoi(argv[argc - 1]));
     Grid            *grid = new Grid(data.xmin, data.ymin, 0.0, data.l, data.l / std::pow(2, data.level), data.dim);
-    ASphere         *geo  = new ASphere(0.0, 0.5, 0, 0.25, 2);
+    ASphere         *geo  = new ASphere(0.0, 0.0, 0, 0.25, 2);
     TransportScheme *trpt = new TransportScheme(&data, grid, geo);
 
     // Initial pos

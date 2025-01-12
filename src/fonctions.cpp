@@ -7,7 +7,7 @@ double vitesseX(double x, double y)
 
 double vitesseY(double x, double y)
 {
-    return 0.0;
+    return 1.0;
 }
 
 

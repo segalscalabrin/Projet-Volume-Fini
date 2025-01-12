@@ -13,6 +13,8 @@ class TransportScheme
         AGeometry  *_geo;
 
         PiercedVector<double> _phi;
+        PiercedVector<double> _phiPrime;
+        PiercedVector<double> _phiSecond;
         PiercedVector<double> _phiExact;
         double _t = 0; 
         double _dt = 0.1;
@@ -31,11 +33,13 @@ class TransportScheme
 
         bool critereMood(long cellId, double new_u);
 
+        PiercedVector<double> computePhiRK(int ordre);
         double computeNewPhi(double phi, std::array<double, 8> borderPhi, int ordre);
-        std::array<double, 8> computeNeighValue(int cellId);
+        double computeFlux(double phi, std::array<double, 8> borderPhi, int ordre);
+        std::array<double, 8> computeNeighValue(int cellId, int RK);
         std::array<long, 8> getCellNeighs(long cellId);
         std::array<long, 4> orderedNeigh(long cellId);
-        double cellBorderCheck(long cellId, long cellToCheckId, std::string signe, std::string direction);
+        double cellBorderCheck(long cellId, long cellToCheckId, int RK, std::string signe, std::string direction);
 };
 
 #endif
