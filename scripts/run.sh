@@ -12,7 +12,7 @@ if [[ ! -f ./levelset ]]; then
 fi
 
 # Exécuter l'exécutable et enregistrer les logs
-./levelset > "${LOG_DIR}/run_log.txt" 2>&1
+./levelset  $1 $2 > "${LOG_DIR}/run_log.txt" 2>&1
 
 # Déplacer les fichiers log générés par la bibliothèque dans le répertoire logs
 mv *.log "${LOG_DIR}/" 2>/dev/null

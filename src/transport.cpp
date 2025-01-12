@@ -3,6 +3,8 @@
 
 void TransportScheme::initializePhi()
 {    
+    _data->u[0] = vitesseX(0., 0.);
+    _data->u[1] = vitesseY(0., 0.);
     _geo->computeLevelSet(_grid);
     _phi = _geo->getPhi();
     _phiExact = _geo->getPhi();
@@ -26,22 +28,17 @@ void TransportScheme::computePhi()
 
     for (auto &cell : _grid->getCells()) {
         const long &cellId = cell.getId();
-        double delta;
-        
-        std::array<double, 4> flux;
         int ordreMood(_data->ordre);
 
-        flux = computeCellFlux(cellId, ordreMood);
-        new_phi[cellId] = _phi[cellId] - (_data->dt / _data->h) * (flux[1] - flux[0])
-                            - (_data->dt / _data->h) * (flux[3] - flux[2]);
+        std::array<double, 8> borderPhi;
+        borderPhi = computeNeighValue(cellId);
+
+        new_phi[cellId] = computeNewPhi(_phi[cellId], borderPhi, ordreMood);
 
         while(!critereMood(cellId, new_phi[cellId]) && ordreMood > 1) {  
             ordreMood--;
-            flux = computeCellFlux(cellId, ordreMood);
-            new_phi[cellId] = _phi[cellId] - (_data->dt / _data->h) * (flux[1] - flux[0])
-                                - (_data->dt / _data->h) * (flux[3] - flux[2]);
+            new_phi[cellId] = computeNewPhi(_phi[cellId], borderPhi, ordreMood);
         }
-        
     }
 
     _phi = new_phi;
@@ -51,8 +48,126 @@ void TransportScheme::computePhi()
     _phiExact = _geo->getPhi();
 }
 
+bool TransportScheme::critereMood(long cellId, double new_u) {
+    std::array<long, 4> neighsId;
+    double umin(_phi[cellId]), umax(_phi[cellId]);
 
-std::array<long, 4> TransportScheme::getCellNeighs(long cellId)
+    neighsId = orderedNeigh(cellId);
+
+    for (int i=0; i<4; i++) {
+        if (neighsId[i] != -1) {
+            umin = std::min(umin, _phi[neighsId[i]]);
+            umax = std::max(umax, _phi[neighsId[i]]);
+        }
+    }
+
+    return (new_u > umin && new_u < umax);
+}
+
+
+double TransportScheme::computeNewPhi(double phi, std::array<double, 8> borderPhi, int ordre)
+{
+    double vx(_data->u[0]), vy(_data->u[1]);
+    double cx( _data->dt * vx / _data->h), cy( _data->dt * vy / _data->h);
+    if (ordre == 3) {
+        /*
+        std::cout << phi << std::endl;
+        std::cout << borderPhi[1] << " " << borderPhi[3] << std::endl;
+        std::cout << borderPhi[0] << " " << borderPhi[2] << std::endl;
+        std::cout << borderPhi[4] << " " << borderPhi[5] << std::endl;
+        std::cout << std::endl;
+        std::cout << _data->dt * (cx / 2.) * (borderPhi[1]  - borderPhi[0]) << std::endl;
+        std::cout << _data->dt * (cx * cx / 2.) * (borderPhi[1] - 2*phi + borderPhi[0])  << std::endl;
+        std::cout << _data->dt * (cx * cx * cx / 12.) * (borderPhi[5] - 2.*borderPhi[1] + 2.*borderPhi[0] - borderPhi[4]) << std::endl;
+        std::cout << std::endl;
+        std::cout << std::endl;
+        */
+        return phi 
+                -(cx / 2.) * (borderPhi[1]  - borderPhi[0]) 
+                +(cx * cx / 2.) * (borderPhi[1] - 2*phi + borderPhi[0]) 
+                -(cx * cx * cx / 12.) * (borderPhi[5] - 2.*borderPhi[1] + 2.*borderPhi[0] - borderPhi[4])
+                -(cy / 2.) * (borderPhi[3]  - borderPhi[2]) 
+                +(cy * cy / 2.) * (borderPhi[3] - 2*phi + borderPhi[2]) 
+                -(cy * cy * cy / 12.) * (borderPhi[7] - 2.*borderPhi[3] + 2.*borderPhi[2] - borderPhi[6]);
+    }
+    else if (ordre == 2) {
+        return phi
+                - (cx / 2.) * (borderPhi[1] - borderPhi[0]) + (cx * cx / 2.) * (borderPhi[1] - 2*phi + borderPhi[0])
+                - (cy / 2.) * (borderPhi[3] - borderPhi[2]) + (cy * cy / 2.) * (borderPhi[3] - 2*phi + borderPhi[2]);
+    }
+    else {
+        if (cx >= 0) {
+            if (cy >= 0) {
+                return phi 
+                        - cx * (phi - borderPhi[0])  // gauche
+                        - cy * (phi - borderPhi[2]); // bas
+            } else {
+                return phi 
+                        - cx * (phi - borderPhi[0])  // gauche
+                        - cy * (borderPhi[3] - phi); // haut
+            }
+        } else {
+            if (cy >= 0) {
+                return phi 
+                        - cx * (borderPhi[1] - phi)  // droite
+                        - cy * (phi - borderPhi[2]); // bas
+            } else {
+                return phi 
+                        - cx * (borderPhi[1] - phi)  // droite
+                        - cy * (borderPhi[3] - phi); // haut
+            }
+        }
+    }
+}
+
+std::array<double, 8> TransportScheme::computeNeighValue(int cellId)
+{
+    std::array<long, 8> neighsId;
+    std::array<double, 8> neighValue;
+
+    neighsId = getCellNeighs(cellId);
+
+    neighValue[0] = cellBorderCheck(cellId, neighsId[0], std::string("moins"), std::string("horizontal"));
+    neighValue[1] = cellBorderCheck(cellId, neighsId[1], std::string("plus"), std::string("horizontal"));
+    neighValue[2] = cellBorderCheck(cellId, neighsId[2], std::string("moins"), std::string("vertical"));
+    neighValue[3] = cellBorderCheck(cellId, neighsId[3], std::string("plus"), std::string("vertical"));
+    neighValue[4] = cellBorderCheck(cellId, neighsId[4], std::string("moinsmoins"), std::string("horizontal"));
+    neighValue[5] = cellBorderCheck(cellId, neighsId[5], std::string("plusplus"), std::string("horizontal"));
+    neighValue[6] = cellBorderCheck(cellId, neighsId[6], std::string("moinsmoins"), std::string("vertical"));
+    neighValue[7] = cellBorderCheck(cellId, neighsId[7], std::string("plusplus"), std::string("vertical"));
+
+    return neighValue;
+}
+
+
+
+std::array<long, 8> TransportScheme::getCellNeighs(long cellId)
+{
+    std::array<long, 4> nearNeighs{-1, -1, -1, -1};
+    std::array<long, 8> neighs{-1, -1, -1, -1, -1, -1, -1, -1};
+    nearNeighs = orderedNeigh(cellId);
+
+    for(int i=0; i<4; i++){
+        neighs[i] = nearNeighs[i];
+    }
+
+    if (neighs[0] != -1) {
+        neighs[4] = orderedNeigh(neighs[0])[0];
+    }
+    if (neighs[1] != -1) {
+        neighs[5] = orderedNeigh(neighs[1])[1];
+    }
+    if (neighs[2] != -1) {
+        neighs[6] = orderedNeigh(neighs[2])[2];
+    }
+    if (neighs[3] != -1) {
+        neighs[7] = orderedNeigh(neighs[3])[3];
+    }
+
+    return neighs;
+}
+
+std::array<long, 4> TransportScheme::orderedNeigh(long cellId)
 {
     std::vector<long> unorderedNeighs;
     std::array<long, 4> neighs{-1, -1, -1, -1};
@@ -80,21 +195,7 @@ std::array<long, 4> TransportScheme::getCellNeighs(long cellId)
     return neighs;
 }
 
-bool TransportScheme::critereMood(long cellId, double new_u) {
-    std::array<long, 4> neighsId;
-    double umin(_phi[cellId]), umax(_phi[cellId]);
 
-    neighsId = getCellNeighs(cellId);
-
-    for (int i=0; i<4; i++) {
-        if (neighsId[i] != -1) {
-            umin = std::min(umin, _phi[neighsId[i]]);
-            umax = std::max(umax, _phi[neighsId[i]]);
-        }
-    }
-
-    return (new_u > umin && new_u < umax);
-}
 
 double TransportScheme::cellBorderCheck(long cellId, long cellToCheckId, std::string signe, std::string direction) {
     double cellSize(0), borderPhi(0);
@@ -111,8 +212,18 @@ double TransportScheme::cellBorderCheck(long cellId, long cellToCheckId, std::st
                 borderPhi = _geo->getLevelSet(borderCoord);
                 return borderPhi;
             }
-            else {
+            else if (signe==std::string("plus")){
                 borderCoord[0] += cellSize;
+                borderPhi = _geo->getLevelSet(borderCoord);
+                return borderPhi;  
+            }
+            else if (signe==std::string("moinsmoins")){
+                borderCoord[0] -= 2*cellSize;
+                borderPhi = _geo->getLevelSet(borderCoord);
+                return borderPhi;  
+            }
+            else if (signe==std::string("plusplus")){
+                borderCoord[0] += 2*cellSize;
                 borderPhi = _geo->getLevelSet(borderCoord);
                 return borderPhi;  
             }
@@ -123,8 +234,18 @@ double TransportScheme::cellBorderCheck(long cellId, long cellToCheckId, std::st
                 borderPhi = _geo->getLevelSet(borderCoord);
                 return borderPhi;
             }
-            else {
+            else if (signe==std::string("plus")){
                 borderCoord[1] += cellSize;
+                borderPhi = _geo->getLevelSet(borderCoord);
+                return borderPhi;  
+            }
+            else if (signe==std::string("moinsmoins")){
+                borderCoord[1] -= 2*cellSize;
+                borderPhi = _geo->getLevelSet(borderCoord);
+                return borderPhi;  
+            }
+            else if (signe==std::string("plusplus")){
+                borderCoord[1] += 2*cellSize;
                 borderPhi = _geo->getLevelSet(borderCoord);
                 return borderPhi;  
             }
@@ -136,149 +257,15 @@ double TransportScheme::cellBorderCheck(long cellId, long cellToCheckId, std::st
     }
 }
 
-std::array<double, 4> TransportScheme::computeCellFlux(int cellId, int ordre)
+
+double TransportScheme::fluxOrdre3(double up, double u, double um, bool horizontal)
 {
-    std::array<long, 4> neighsId;
-    std::array<double, 4> flux;
-
-    neighsId = getCellNeighs(cellId);
-
-    flux[0] = computeFlux(neighsId[0], cellId, neighsId[1], ordre, std::string("moins"), std::string("horizontal"));
-    flux[1] = computeFlux(neighsId[0], cellId, neighsId[1], ordre, std::string("plus"), std::string("horizontal"));
-    flux[2] = computeFlux(neighsId[2], cellId, neighsId[3], ordre, std::string("moins"), std::string("vertical"));
-    flux[3] = computeFlux(neighsId[2], cellId, neighsId[3], ordre, std::string("plus"), std::string("vertical"));
-
-    return flux;
-}
-
-
-double TransportScheme::computeFlux(long cellmId, long cellId, long cellpId, int ordre, std::string signe, std::string direction)
-{   
-    double phiM, phi, phiP;
-
-    phi = _phi[cellId];
-    phiM = cellBorderCheck(cellId, cellmId, std::string("moins"), direction);
-    phiP = cellBorderCheck(cellId, cellpId, std::string("plus"), direction);
-
-    if (direction==std::string("horizontal")) {
-        return Flux_F(phiM, phi, phiP, ordre, signe);
-    }
-    else if (direction==std::string("vertical")) {
-        return Flux_G(phiM, phi, phiP, ordre, signe);
+    double delta(_data->h), vx(_data->u[0]), vy(_data->u[1]);
+    double coefX((delta/2. - vx*_data->dt/2.)), coefY((delta/2. - vy*_data->dt/2.));
+    if (horizontal) {
+        return vx * (u + coefX*((up - u)/delta  + coefX*(up - 2.*u + um)/(delta*delta)));
     }
     else {
-        std::cerr << "Direction flux non conforme" << std::endl;
-        exit(1);
-    }
-}
-
-double TransportScheme::Flux_F(double um, double u, double up, int ordre, std::string signe)
-{   
-    if (ordre == 3) {
-        std::cerr << "pas implémenté" << std::endl;
-        exit(1);
-    }
-    else if(ordre == 2) {
-        if (signe==std::string("plus")) {
-            return F_ordre2(u, up);
-        }
-        else if (signe==std::string("moins")) {
-            return F_ordre2(um, u);
-        }
-        else {
-            std::cerr << "Signe flux non conforme" << std::endl;
-            exit(1);
-        }
-    }
-    else if(ordre == 1) {
-        if (signe==std::string("plus")) {
-            return F_ordre1(u, up);
-        }
-        else if (signe==std::string("moins")) {
-            return F_ordre1(um, u);
-        }
-        else {
-            std::cerr << "Signe flux non conforme" << std::endl;
-            exit(1);
-        }
-    }
-    else {
-        std::cerr << "Ordre schema non conforme" << std::endl;
-        exit(1);
-    }
-}
-
-double TransportScheme::Flux_G(double um, double u, double up, int ordre, std::string signe)
-{   
-    if (ordre == 3) {
-        std::cerr << "pas implémenté" << std::endl;
-        exit(1);
-    }
-    else if(ordre == 2) {
-        if (signe==std::string("plus")) {
-            return G_ordre2(u, up);
-        }
-        else if (signe==std::string("moins")) {
-            return G_ordre2(um, u);
-        }
-        else {
-            std::cerr << "Signe flux non conforme" << std::endl;
-            exit(1);
-        }
-    }
-    else if(ordre == 1) {
-        if (signe==std::string("plus")) {
-            return G_ordre1(u, up);
-        }
-        else if (signe==std::string("moins")) {
-            return G_ordre1(um, u);
-        }
-        else {
-            std::cerr << "Signe flux non conforme" << std::endl;
-            exit(1);
-        }
-    }
-    else {
-        std::cerr << "Ordre schema non conforme" << std::endl;
-        exit(1);
-    }
-}
-
-
-double TransportScheme::F_ordre2(double um, double up)
-{   
-    double ux = _data->u[0]; 
-    double c = ux * _data->dt / _data->h;
-
-    return 0.5 * ux * (up + um - c * (up - um));
-}
-
-double TransportScheme::G_ordre2(double um, double up)
-{   
-    double uy = _data->u[1]; 
-    double c = uy * _data->dt / _data->h; 
-
-    return 0.5 * uy * (up + um - c * (up - um));
-}
-
-double TransportScheme::F_ordre1(double um, double up)
-{   
-    double ux(_data->u[0]);
-    if (ux>=0) {
-        return ux*um;
-    }
-    else {
-        return ux*up;
-    }
-}
-
-double TransportScheme::G_ordre1(double um, double up)
-{   
-    double uy(_data->u[1]);
-    if (uy>=0) {
-        return uy*um;
-    }
-    else {
-        return uy*up;
+        return vy * (u + coefY*((up - u)/delta  + coefY*(up - 2.*u + um)/(delta*delta)));
     }
 }
