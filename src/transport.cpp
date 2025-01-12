@@ -8,6 +8,8 @@ void TransportScheme::initializePhi()
     _geo->computeLevelSet(_grid);
     _phi = _geo->getPhi();
     _phiExact = _geo->getPhi();
+    _t = 0;
+    _dt = 0.5*_grid->evalCellSize(0)/std::abs(std::max(_data->u[0], _data->u[1]));
 }
 
 const PiercedVector<double>& TransportScheme::getPhi()
@@ -20,8 +22,19 @@ const PiercedVector<double>& TransportScheme::getPhiExact()
     return _phiExact;
 }
 
+const double& TransportScheme::getT()
+{
+    return _t;
+}
+
+const double& TransportScheme::getDT()
+{
+    return _dt;
+}
+
 void TransportScheme::computePhi()
 {
+    _t += _dt;
     // Initialiser les vecteurs auxiliaires
     std::vector<double> new_phi0(_grid->nbCells(), 0.0);
     PiercedVector<double> new_phi = VtoPV(new_phi0, _grid);
@@ -43,7 +56,7 @@ void TransportScheme::computePhi()
 
     _phi = new_phi;
 
-    _geo->updateCenter(_data->dt, _data->u);
+    _geo->updateCenter(_dt, _data->u);
     _geo->computeLevelSet(_grid);
     _phiExact = _geo->getPhi();
 }
@@ -68,21 +81,9 @@ bool TransportScheme::critereMood(long cellId, double new_u) {
 double TransportScheme::computeNewPhi(double phi, std::array<double, 8> borderPhi, int ordre)
 {
     double vx(_data->u[0]), vy(_data->u[1]);
-    double cx( _data->dt * vx / _data->h), cy( _data->dt * vy / _data->h);
+    double cx( _dt * vx / _grid->evalCellSize(0)), cy( _dt * vy / _grid->evalCellSize(0));
     if (ordre == 3) {
-        /*
-        std::cout << phi << std::endl;
-        std::cout << borderPhi[1] << " " << borderPhi[3] << std::endl;
-        std::cout << borderPhi[0] << " " << borderPhi[2] << std::endl;
-        std::cout << borderPhi[4] << " " << borderPhi[5] << std::endl;
-        std::cout << std::endl;
-        std::cout << _data->dt * (cx / 2.) * (borderPhi[1]  - borderPhi[0]) << std::endl;
-        std::cout << _data->dt * (cx * cx / 2.) * (borderPhi[1] - 2*phi + borderPhi[0])  << std::endl;
-        std::cout << _data->dt * (cx * cx * cx / 12.) * (borderPhi[5] - 2.*borderPhi[1] + 2.*borderPhi[0] - borderPhi[4]) << std::endl;
-        std::cout << std::endl;
-        std::cout << std::endl;
-        */
-        return phi 
+        return phi
                 -(cx / 2.) * (borderPhi[1]  - borderPhi[0]) 
                 +(cx * cx / 2.) * (borderPhi[1] - 2*phi + borderPhi[0]) 
                 -(cx * cx * cx / 12.) * (borderPhi[5] - 2.*borderPhi[1] + 2.*borderPhi[0] - borderPhi[4])
@@ -255,17 +256,5 @@ double TransportScheme::cellBorderCheck(long cellId, long cellToCheckId, std::st
             exit(1);
         }
     }
-}
-
-
-double TransportScheme::fluxOrdre3(double up, double u, double um, bool horizontal)
-{
-    double delta(_data->h), vx(_data->u[0]), vy(_data->u[1]);
-    double coefX((delta/2. - vx*_data->dt/2.)), coefY((delta/2. - vy*_data->dt/2.));
-    if (horizontal) {
-        return vx * (u + coefX*((up - u)/delta  + coefX*(up - 2.*u + um)/(delta*delta)));
-    }
-    else {
-        return vy * (u + coefY*((up - u)/delta  + coefY*(up - 2.*u + um)/(delta*delta)));
-    }
+    return 0.0;
 }

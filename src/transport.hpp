@@ -14,6 +14,8 @@ class TransportScheme
 
         PiercedVector<double> _phi;
         PiercedVector<double> _phiExact;
+        double _t = 0; 
+        double _dt = 0.1;
 
     public:
         TransportScheme(Data *data, Grid *grid, AGeometry *geo) : _data(data), _grid(grid), _geo(geo) {}
@@ -22,6 +24,8 @@ class TransportScheme
         void initializePhi();
         const PiercedVector<double>& getPhi();
         const PiercedVector<double>& getPhiExact();
+        const double& getT();
+        const double& getDT();
 
         void computePhi();
 
@@ -32,8 +36,6 @@ class TransportScheme
         std::array<long, 8> getCellNeighs(long cellId);
         std::array<long, 4> orderedNeigh(long cellId);
         double cellBorderCheck(long cellId, long cellToCheckId, std::string signe, std::string direction);
-
-        double fluxOrdre3(double up, double u, double um, bool horizontal);
 };
 
 #endif
