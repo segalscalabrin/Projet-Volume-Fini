@@ -1,7 +1,8 @@
 solutions/
-
 builds/
-
 logs/
+.vscode/
 
 levelset
+plot_order1.py
+plot_order2.py

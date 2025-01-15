@@ -38,6 +38,7 @@ void TransportScheme::computePhi()
     // Initialiser les vecteurs auxiliaires
     std::vector<double> new_phi0(_grid->nbCells(), 0.0);
     PiercedVector<double> new_phi = VtoPV(new_phi0, _grid);
+    double compteurMood(0);
 
     for (auto &cell : _grid->getCells()) {
         const long &cellId = cell.getId();
@@ -51,8 +52,11 @@ void TransportScheme::computePhi()
         while(!critereMood(cellId, new_phi[cellId]) && ordreMood > 1) {  
             ordreMood--;
             new_phi[cellId] = computeNewPhi(_phi[cellId], borderPhi, ordreMood);
+            compteurMood++;
         }
     }
+
+    std::cout << compteurMood << std::endl;
 
     _phi = new_phi;
 
@@ -83,13 +87,14 @@ double TransportScheme::computeNewPhi(double phi, std::array<double, 8> borderPh
     double vx(_data->u[0]), vy(_data->u[1]);
     double cx( _dt * vx / _grid->evalCellSize(0)), cy( _dt * vy / _grid->evalCellSize(0));
     if (ordre == 3) {
-        return phi
-                -(cx / 2.) * (borderPhi[1]  - borderPhi[0]) 
-                +(cx * cx / 2.) * (borderPhi[1] - 2*phi + borderPhi[0]) 
-                -(cx * cx * cx / 12.) * (borderPhi[5] - 2.*borderPhi[1] + 2.*borderPhi[0] - borderPhi[4])
-                -(cy / 2.) * (borderPhi[3]  - borderPhi[2]) 
-                +(cy * cy / 2.) * (borderPhi[3] - 2*phi + borderPhi[2]) 
-                -(cy * cy * cy / 12.) * (borderPhi[7] - 2.*borderPhi[3] + 2.*borderPhi[2] - borderPhi[6]);
+        return  phi * (1 - cx - cx*cx + cx*cx*cx/2.) 
+                + borderPhi[1] * (cx*cx/2. + cx*cx*cx/6.) 
+                + borderPhi[0] * (cx + cx*cx/2. + cx*cx*cx/3.) 
+                + borderPhi[4] * (cx*cx*cx/6.) 
+                + phi * (- cy - cy*cy + cy*cy*cy/2.) 
+                + borderPhi[3] * (cy*cy/2. + cy*cy*cy/6.) 
+                + borderPhi[2] * (cy + cy*cy/2. + cy*cy*cy/3.) 
+                + borderPhi[6] * (cy*cy*cy/6.);
     }
     else if (ordre == 2) {
         return phi
