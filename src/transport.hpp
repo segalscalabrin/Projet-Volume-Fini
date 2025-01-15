@@ -3,8 +3,6 @@
 
 #include "include.hpp"
 
-#include "fonctions.hpp"
-
 class TransportScheme
 {
     private:
@@ -21,7 +19,7 @@ class TransportScheme
         TransportScheme(Data *data, Grid *grid, AGeometry *geo) : _data(data), _grid(grid), _geo(geo) {}
         ~TransportScheme() {}
 
-        void initializePhi();
+        void initializeScheme();
         const PiercedVector<double>& getPhi();
         const PiercedVector<double>& getPhiExact();
         const double& getT();

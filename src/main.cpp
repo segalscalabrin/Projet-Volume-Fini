@@ -26,8 +26,9 @@ sudo docker run -it -v $(pwd):/builds/workspace neos
 
 #include "include.hpp"
 
-#include "export.hpp"
 #include "transport.hpp"
+#include "fonctions.hpp"
+#include "export.hpp"
 
 
 int main(int argc, char **argv) {
@@ -41,7 +42,7 @@ int main(int argc, char **argv) {
     TransportScheme *trpt = new TransportScheme(&data, grid, geo);
 
     // Initial pos
-    trpt->initializePhi();
+    trpt->initializeScheme();
     exportResults(grid, trpt->getPhi(), data.solName, i);
     exportResults(grid, trpt->getPhiExact(), data.solNameExacte, i);
 
